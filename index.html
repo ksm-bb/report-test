@@ -2,21 +2,21 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Support System</title>
     
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    
     <script> window.react = window.React; </script>
-
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-    
     <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.min.js"></script>
 
     <style>
+        /* ล็อกการเด้งยืดหยุ่น (Overscroll) */
+        body { overscroll-behavior-y: none; background-color: #FFF5F8; }
+        
         @keyframes blob {
             0% { transform: translate(0px, 0px) scale(1); }
             33% { transform: translate(20px, -40px) scale(1.05); }
@@ -40,14 +40,9 @@
 
     <script type="text/babel">
         const { useState, useEffect } = React;
-        
-        // 🌟 ระบบป้องกันเว็บจอขาว: UMD ของ lucide-react มักจะใช้ชื่อ global ว่า window.lucide 
         const lucideLib = window.lucide || window.lucideReact || window.LucideReact || {};
-        
-        // ถ้าโหลดไอคอนไม่สำเร็จ จะแสดงวงกลมสีชมพูขยับได้แทน เพื่อไม่ให้ Error Undefined!
         const FallbackIcon = () => <span className="w-5 h-5 bg-pink-200 rounded-full inline-block animate-pulse"></span>;
 
-        // ดึงไอคอนมาใช้งาน พร้อมใส่ Fallback กันเหนียว
         const { 
             Home = FallbackIcon, ListTodo = FallbackIcon, CheckCircle2 = FallbackIcon, 
             Clock = FallbackIcon, AlertCircle = FallbackIcon, Image: ImageIcon = FallbackIcon, 
@@ -56,12 +51,17 @@
             ShieldCheck = FallbackIcon, Send = FallbackIcon, CheckCircle = FallbackIcon, 
             X = FallbackIcon, ChevronRight = FallbackIcon, Info = FallbackIcon, 
             Activity = FallbackIcon, Zap = FallbackIcon, Layout = FallbackIcon, 
-            Hourglass = FallbackIcon, Wrench = FallbackIcon, Loader2 = FallbackIcon 
+            Hourglass = FallbackIcon, Wrench = FallbackIcon, Loader2 = FallbackIcon,
+            Trash2 = FallbackIcon, Edit3 = FallbackIcon, ChevronLeft = FallbackIcon // ไอคอนใหม่ที่เพิ่ม
         } = lucideLib;
 
-        // --- ⚠️ อย่าลืมใส่ SCRIPT_URL ของคุณนะครับ ⚠️ ---
+        // ⚠️ เปลี่ยน URL ของคุณตรงนี้ ⚠️
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw6JDJIYrGSCA4_xqRCifbBBAaihlc_aja3KYSoM9OUsK1k86LQzN1MoSQF33a2k9cl-A/exec";
         const LIFF_ID = "2009412663-XOZGG4cg";
+        
+        // 🖼️ ตั้งค่ารูปลิงก์ไดร์ฟตายตัวสำหรับ Profile และ Banner ตรงนี้
+        const PROFILE_IMG_URL = "https://i.ibb.co/Kp25CBLg/S-45219850.jpg"; 
+        const BANNER_IMG_URL = "ใส่_URL_รูปแบนเนอร์_ที่นี่"; 
 
         const glassCardStyle = "bg-white/70 backdrop-blur-md border border-white/50 shadow-[0_8px_30px_rgb(255,182,193,0.3)] rounded-3xl";
         const inputStyle = "w-full bg-white/50 border border-pink-100 focus:border-pink-300 focus:ring-2 focus:ring-pink-200 rounded-2xl px-4 py-3 text-gray-700 outline-none transition-all placeholder-pink-300 text-sm";
@@ -74,8 +74,15 @@
             
             const [isLoading, setIsLoading] = useState(true);
             const [isSubmitting, setIsSubmitting] = useState(false);
+            const [loadingMsg, setLoadingMsg] = useState(""); // ⏳ ข้อความ Loading
+            
             const [issues, setIssues] = useState([]);
-            const [userProfile, setUserProfile] = useState({ uid: '', name: 'Guest', pic: '' });
+            const [adminNote, setAdminNote] = useState("กำลังโหลดข้อมูล...");
+            const [isEditingNote, setIsEditingNote] = useState(false);
+            const [tempNote, setTempNote] = useState("");
+
+            // 🖼️ ระบบ Lightbox
+            const [lightbox, setLightbox] = useState({ isOpen: false, images: [], index: 0 });
 
             const [formData, setFormData] = useState({
                 submitterName: '', submitterEmail: '', app: '', days: '', 
@@ -83,21 +90,9 @@
                 purchaseDate: '', problem: '', issueImages: [], receiptImages: []
             });
 
-            // 1. Initialize LIFF & ดึงข้อมูล
             useEffect(() => {
-                const initApp = async () => {
-                    try {
-                        if (window.liff) {
-                            await liff.init({ liffId: LIFF_ID });
-                            if (liff.isLoggedIn()) {
-                                const profile = await liff.getProfile();
-                                setUserProfile({ uid: profile.userId, name: profile.displayName, pic: profile.pictureUrl });
-                            }
-                        }
-                    } catch (err) { console.error("LIFF Error", err); }
-                    fetchIssues();
-                };
-                initApp();
+                if (window.liff) { liff.init({ liffId: LIFF_ID }).catch(err => console.error(err)); }
+                fetchIssues();
             }, []);
 
             const fetchIssues = async () => {
@@ -105,17 +100,21 @@
                 try {
                     const res = await fetch(SCRIPT_URL);
                     const data = await res.json();
-                    setIssues(Array.isArray(data) ? data : []);
+                    if (data.issues) {
+                        setIssues(data.issues);
+                        setAdminNote(data.adminNote);
+                    } else {
+                        setIssues(Array.isArray(data) ? data : []); // Fallback ป้องกันเว็บพัง
+                    }
                 } catch (err) { console.error("Fetch Error", err); }
                 setIsLoading(false);
             };
 
-            // 2. แปลงรูปเป็น Base64 แบบรองรับหลายรูป
             const handleImageUpload = async (e, field) => {
                 const files = Array.from(e.target.files);
                 const promises = files.map(file => new Promise((resolve) => {
                     const reader = new FileReader();
-                    reader.onload = (ev) => resolve(ev.target.result);
+                    reader.onload = (e) => resolve(e.target.result);
                     reader.readAsDataURL(file);
                 }));
                 const base64s = await Promise.all(promises);
@@ -127,23 +126,20 @@
                 setFormData(prev => ({ ...prev, [name]: value }));
             };
 
-            // 3. ส่งข้อมูลแจ้งปัญหา
+            // กดส่งฟอร์ม
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 setIsSubmitting(true);
+                setLoadingMsg("กำลังบันทึกข้อมูล กรุณารอสักครู่...");
                 try {
                     const res = await fetch(SCRIPT_URL, {
                         method: 'POST',
-                        body: JSON.stringify({ ...formData, uid: userProfile.uid, action: 'submit' })
+                        body: JSON.stringify({ ...formData, action: 'submit' })
                     });
                     const result = await res.json();
                     if (result.status === 'success') {
                         alert('ส่งข้อมูลแจ้งปัญหาเรียบร้อยแล้วค่ะ! 💖');
-                        setFormData({
-                            submitterName: '', submitterEmail: '', app: '', days: '', 
-                            accountEmail: '', accountPassword: '', screen: '', 
-                            purchaseDate: '', problem: '', issueImages: [], receiptImages: []
-                        });
+                        setFormData({ submitterName: '', submitterEmail: '', app: '', days: '', accountEmail: '', accountPassword: '', screen: '', purchaseDate: '', problem: '', issueImages: [], receiptImages: [] });
                         fetchIssues();
                         setActiveTab('list');
                     }
@@ -151,31 +147,84 @@
                 setIsSubmitting(false);
             };
 
-            // 4. แอดมินกดเปลี่ยนสถานะ
+            // อัปเดตสถานะ
             const changeStatus = async (timestamp, newStatus) => {
                 setIsSubmitting(true);
+                setLoadingMsg("กำลังอัปเดตสถานะ...");
                 try {
                     const res = await fetch(SCRIPT_URL, {
                         method: 'POST',
                         body: JSON.stringify({ action: 'updateStatus', timestamp, newStatus })
                     });
-                    const result = await res.json();
-                    if (result.status === 'success') {
+                    if ((await res.json()).status === 'success') {
                         await fetchIssues();
-                        setSelectedIssue(null); // ปิด Modal หลังจากแก้เสร็จ
+                        setSelectedIssue(null);
                     }
-                } catch (err) { alert('อัปเดตสถานะไม่สำเร็จ'); }
+                } catch (err) { alert('อัปเดตไม่สำเร็จ'); }
                 setIsSubmitting(false);
             };
 
+            // ลบรายการ
+            const deleteIssue = async (timestamp) => {
+                if(!confirm("ยืนยันการลบรายการนี้ใช่หรือไม่? ข้อมูลจะไม่สามารถกู้คืนได้")) return;
+                setIsSubmitting(true);
+                setLoadingMsg("กำลังลบรายการ...");
+                try {
+                    const res = await fetch(SCRIPT_URL, {
+                        method: 'POST',
+                        body: JSON.stringify({ action: 'delete', timestamp })
+                    });
+                    if ((await res.json()).status === 'success') {
+                        await fetchIssues();
+                        setSelectedIssue(null);
+                    }
+                } catch (err) { alert('ลบรายการไม่สำเร็จ'); }
+                setIsSubmitting(false);
+            };
+
+            // อัปเดต Note
+            const saveNote = async () => {
+                setIsSubmitting(true);
+                setLoadingMsg("กำลังบันทึกข้อความ...");
+                try {
+                    await fetch(SCRIPT_URL, {
+                        method: 'POST',
+                        body: JSON.stringify({ action: 'updateNote', note: tempNote })
+                    });
+                    setAdminNote(tempNote);
+                    setIsEditingNote(false);
+                } catch (err) { alert('บันทึกข้อความไม่สำเร็จ'); }
+                setIsSubmitting(false);
+            };
+
+            // เปิด Lightbox
+            const openGallery = (imgArray, startIndex) => {
+                setLightbox({ isOpen: true, images: imgArray, index: startIndex });
+            };
+
+            // คำนวณ Dashboard & Status
             const totalIssues = issues.length;
             const resolvedCount = issues.filter(i => i.status === 'completed').length;
             const unresolvedCount = totalIssues - resolvedCount;
             const resolvedPercentage = totalIssues > 0 ? (resolvedCount / totalIssues) * 100 : 0;
 
+            // 🚦 สีไฟสถานะ
+            let statusColor = "text-green-500"; let statusBg = "bg-green-400"; let statusLabel = "Normal Intensity";
+            if (unresolvedCount >= 10) { statusColor = "text-red-500"; statusBg = "bg-red-500"; statusLabel = "Critical Intensity"; } 
+            else if (unresolvedCount >= 5) { statusColor = "text-orange-500"; statusBg = "bg-orange-500"; statusLabel = "Busy Intensity"; }
+
+            // 💬 แถบเลื่อนเวลาล่าสุด
+            let tickerMsg = "สถานะปัจจุบัน: พร้อมให้บริการ • หากพบปัญหาสามารถกรอกฟอร์มแจ้งได้ทันที แอดมินจะรีบดำเนินการให้เร็วที่สุดค่ะ";
+            const latestDone = issues.find(i => i.status === 'completed');
+            if (latestDone) {
+                const diffMs = new Date() - new Date(latestDone.timestamp);
+                const diffMins = Math.floor(diffMs / 60000);
+                const timeStr = diffMins < 60 ? `${diffMins} นาทีที่แล้ว` : `${Math.floor(diffMins/60)} ชั่วโมงที่แล้ว`;
+                tickerMsg = `ล่าสุด: แอดมินแก้ไขปัญหาแอป ${latestDone.app} ของคุณ ${latestDone.submitterName} เสร็จสิ้นแล้ว (${timeStr}) • แอดมินพร้อมสแตนด์บายรับเรื่องค่ะ`;
+            }
+
             const DonutChart = ({ percentage }) => {
-                const radius = 35;
-                const circumference = 2 * Math.PI * radius;
+                const radius = 35; const circumference = 2 * Math.PI * radius;
                 const offset = circumference - (percentage / 100) * circumference;
                 return (
                     <div className="relative flex items-center justify-center w-20 h-20">
@@ -202,32 +251,29 @@
                             {activeTab === 'home' && (
                                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     
-                                    {/* Header / Profile */}
+                                    {/* Header / Profile (ล็อกลิงก์ตายตัว) */}
                                     <div className={`${glassCardStyle} p-4 flex items-center justify-between`}>
                                         <div className="flex flex-col">
                                             <div className="flex items-center gap-2">
                                                 <h1 className="text-2xl font-black text-pink-400 tracking-wider">TEST SYSTEM</h1>
-                                                <span className="px-2 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-bold rounded-full border border-gray-200 uppercase tracking-tighter">
-                                                    {userProfile.uid ? 'Line User' : 'Guest'}
-                                                </span>
+                                                <span className="px-2 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-bold rounded-full border border-gray-200 uppercase tracking-tighter">Support</span>
                                             </div>
-                                            <span className="text-xs text-pink-300 font-medium tracking-widest mt-1 uppercase">— {userProfile.name} —</span>
+                                            <span className="text-xs text-pink-300 font-medium tracking-widest mt-1 uppercase">— ระบบแจ้งปัญหา —</span>
                                         </div>
                                         <div className="w-14 h-14 bg-white rounded-2xl border-2 border-pink-100 shadow-sm flex items-center justify-center overflow-hidden">
-                                            {userProfile.pic ? (
-                                                <img src={userProfile.pic} className="w-full h-full object-cover" />
+                                            {PROFILE_IMG_URL.includes("http") ? (
+                                                <img src={PROFILE_IMG_URL} className="w-full h-full object-cover" />
                                             ) : (
-                                                <div className="w-full h-full bg-gradient-to-br from-pink-200 to-pink-100 flex items-center justify-center text-white">
-                                                    <User size={28} />
-                                                </div>
+                                                <div className="w-full h-full bg-gradient-to-br from-pink-200 to-pink-100 flex items-center justify-center text-white"><User size={28} /></div>
                                             )}
                                         </div>
                                     </div>
 
-                                    {/* Banner Section */}
+                                    {/* Banner Section (ล็อกลิงก์ตายตัว) */}
                                     <div className={`${glassCardStyle} p-0 h-32 relative overflow-hidden bg-gradient-to-br from-pink-300 to-pink-200 flex items-center justify-center`}>
-                                        <div className="absolute top-[-20%] left-[-10%] w-32 h-32 bg-white/20 rounded-full blur-xl"></div>
-                                        <div className="absolute bottom-[-20%] right-[-10%] w-40 h-40 bg-pink-400/20 rounded-full blur-2xl"></div>
+                                        {BANNER_IMG_URL.includes("http") && <img src={BANNER_IMG_URL} className="absolute inset-0 w-full h-full object-cover opacity-80 mix-blend-overlay" />}
+                                        <div className="absolute top-[-20%] left-[-10%] w-32 h-32 bg-white/20 rounded-full blur-xl pointer-events-none"></div>
+                                        <div className="absolute bottom-[-20%] right-[-10%] w-40 h-40 bg-pink-400/20 rounded-full blur-2xl pointer-events-none"></div>
                                         <div className="z-10 flex items-center gap-4 px-6 w-full h-full">
                                             <div className="w-16 h-16 bg-white/30 backdrop-blur rounded-2xl flex items-center justify-center border border-white/40 shadow-sm">
                                                 <Layout className="text-white" size={32} />
@@ -258,9 +304,7 @@
                                                 </>
                                             ) : (
                                                 <div className="flex flex-col items-center justify-center py-2">
-                                                    <div className="w-10 h-10 bg-green-100 text-green-500 rounded-full flex items-center justify-center mb-2 animate-pulse">
-                                                        <CheckCircle size={20} />
-                                                    </div>
+                                                    <div className="w-10 h-10 bg-green-100 text-green-500 rounded-full flex items-center justify-center mb-2 animate-pulse"><CheckCircle size={20} /></div>
                                                     <p className="text-[10px] font-bold text-green-500 leading-tight">แก้ไข<br/>ครบแล้ว! ✨</p>
                                                 </div>
                                             )}
@@ -275,8 +319,8 @@
                                                 <span className="text-[10px] font-bold text-pink-400 uppercase tracking-widest">System Status</span>
                                             </div>
                                             <div className="flex items-center gap-1.5">
-                                                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                                                <span className="text-[10px] font-bold text-green-500 uppercase">Normal Intensity</span>
+                                                <span className={`w-2 h-2 ${statusBg} rounded-full animate-pulse`}></span>
+                                                <span className={`text-[10px] font-bold ${statusColor} uppercase`}>{statusLabel}</span>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
@@ -284,19 +328,31 @@
                                                 <Activity size={12} className="text-pink-400" />
                                             </div>
                                             <div className="overflow-hidden whitespace-nowrap">
-                                                <p className="text-[10px] text-gray-500 animate-marquee inline-block pl-full">
-                                                    สถานะปัจจุบัน: พร้อมให้บริการ • แอดมินพร้อมสแตนด์บายรับเรื่องค่ะ
-                                                </p>
+                                                <p className="text-[10px] text-gray-500 animate-marquee inline-block pl-full">{tickerMsg}</p>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* NOTES */}
+                                    {/* NOTES (แก้ไขได้โดย Admin) */}
                                     <div className="space-y-2">
-                                        <span className="text-[10px] font-bold text-pink-300 ml-2 uppercase tracking-[0.2em]">Notes</span>
-                                        <div className="bg-white/90 backdrop-blur shadow-sm border border-pink-50 p-4 rounded-[2rem] flex items-center gap-3">
-                                            <div className="text-xl">🐰</div>
-                                            <p className="text-sm font-bold text-gray-600 tracking-tight">กรอกฟอร์มแจ้งปัญหาได้เลยค่ะ</p>
+                                        <div className="flex justify-between items-center px-2">
+                                            <span className="text-[10px] font-bold text-pink-300 uppercase tracking-[0.2em]">Notes</span>
+                                            {isAdmin && !isEditingNote && <button onClick={() => { setIsEditingNote(true); setTempNote(adminNote); }} className="text-[9px] text-pink-400 flex items-center gap-1"><Edit3 size={10}/> EDIT</button>}
+                                        </div>
+                                        
+                                        <div className="bg-white/90 backdrop-blur shadow-sm border border-pink-50 p-4 rounded-[2rem] flex items-start gap-3">
+                                            <div className="text-xl pt-1">🐰</div>
+                                            {isEditingNote ? (
+                                                <div className="w-full flex flex-col gap-2">
+                                                    <textarea value={tempNote} onChange={(e) => setTempNote(e.target.value)} className="w-full text-sm font-bold text-gray-600 tracking-tight bg-pink-50 rounded-xl p-2 outline-none border border-pink-100" rows="3"></textarea>
+                                                    <div className="flex justify-end gap-2">
+                                                        <button onClick={() => setIsEditingNote(false)} className="text-[10px] text-gray-400 font-bold px-2 py-1">ยกเลิก</button>
+                                                        <button onClick={saveNote} disabled={isSubmitting} className="text-[10px] bg-pink-400 text-white rounded-lg px-3 py-1 font-bold">{isSubmitting ? 'กำลังบันทึก...' : 'บันทึก'}</button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <p className="text-sm font-bold text-gray-600 tracking-tight whitespace-pre-line">{adminNote}</p>
+                                            )}
                                         </div>
                                     </div>
 
@@ -308,14 +364,8 @@
                                                 <h3 className="font-bold text-pink-500 text-xs uppercase tracking-widest">Contact Info</h3>
                                             </div>
                                             <div className="grid grid-cols-1 gap-4">
-                                                <div>
-                                                    <label className={labelStyle}>ชื่อผู้แจ้ง</label>
-                                                    <input required type="text" name="submitterName" value={formData.submitterName} onChange={handleInputChange} className={inputStyle} placeholder="ระบุชื่อของคุณ" />
-                                                </div>
-                                                <div>
-                                                    <label className={labelStyle}>E-mail ผู้แจ้ง</label>
-                                                    <input required type="email" name="submitterEmail" value={formData.submitterEmail} onChange={handleInputChange} className={inputStyle} placeholder="example@mail.com" />
-                                                </div>
+                                                <div><label className={labelStyle}>ชื่อผู้แจ้ง</label><input required name="submitterName" value={formData.submitterName} onChange={handleInputChange} className={inputStyle} placeholder="ระบุชื่อของคุณ" disabled={isSubmitting} /></div>
+                                                <div><label className={labelStyle}>E-mail ผู้แจ้ง</label><input required type="email" name="submitterEmail" value={formData.submitterEmail} onChange={handleInputChange} className={inputStyle} placeholder="example@mail.com" disabled={isSubmitting} /></div>
                                             </div>
                                         </div>
 
@@ -331,7 +381,7 @@
                                                     <label className={`flex flex-col items-center justify-center w-full h-20 border-2 border-dashed rounded-2xl cursor-pointer transition-colors ${formData.issueImages.length > 0 ? 'border-pink-300 bg-pink-50' : 'border-pink-100 bg-white/40 hover:bg-pink-50'}`}>
                                                         <ImageIcon className="text-pink-200 mb-1" size={20} />
                                                         <span className="text-[9px] text-pink-300 font-bold uppercase">Upload</span>
-                                                        <input type="file" multiple className="hidden" onChange={(e) => handleImageUpload(e, 'issueImages')} />
+                                                        <input type="file" multiple className="hidden" onChange={(e) => handleImageUpload(e, 'issueImages')} disabled={isSubmitting} />
                                                     </label>
                                                 </div>
                                                 <div>
@@ -339,61 +389,31 @@
                                                     <label className={`flex flex-col items-center justify-center w-full h-20 border-2 border-dashed rounded-2xl cursor-pointer transition-colors ${formData.receiptImages.length > 0 ? 'border-pink-300 bg-pink-50' : 'border-pink-100 bg-white/40 hover:bg-pink-50'}`}>
                                                         <ImageIcon className="text-pink-200 mb-1" size={20} />
                                                         <span className="text-[9px] text-pink-300 font-bold uppercase">Upload</span>
-                                                        <input type="file" multiple className="hidden" onChange={(e) => handleImageUpload(e, 'receiptImages')} />
+                                                        <input type="file" multiple className="hidden" onChange={(e) => handleImageUpload(e, 'receiptImages')} disabled={isSubmitting} />
                                                     </label>
                                                 </div>
                                             </div>
 
                                             <div className="grid grid-cols-2 gap-3">
-                                                <div>
-                                                    <label className={labelStyle}>แอพ</label>
-                                                    <div className="relative">
-                                                        <Smartphone className="absolute left-3 top-3.5 text-pink-200" size={16} />
-                                                        <input required type="text" name="app" value={formData.app} onChange={handleInputChange} className={`${inputStyle} pl-10`} placeholder="เช่น Netflix" />
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <label className={labelStyle}>จำนวนวัน</label>
-                                                    <input required type="number" name="days" value={formData.days} onChange={handleInputChange} className={inputStyle} placeholder="30" />
-                                                </div>
+                                                <div><label className={labelStyle}>แอพ</label><div className="relative"><Smartphone className="absolute left-3 top-3.5 text-pink-200" size={16} /><input required name="app" value={formData.app} onChange={handleInputChange} className={`${inputStyle} pl-10`} placeholder="เช่น Netflix" disabled={isSubmitting}/></div></div>
+                                                <div><label className={labelStyle}>จำนวนวัน</label><input required type="number" name="days" value={formData.days} onChange={handleInputChange} className={inputStyle} placeholder="30" disabled={isSubmitting}/></div>
                                             </div>
 
                                             <div className="grid grid-cols-2 gap-3">
-                                                <div>
-                                                    <label className={labelStyle}>อีเมล (แอพ)</label>
-                                                    <input required type="text" name="accountEmail" value={formData.accountEmail} onChange={handleInputChange} className={inputStyle} placeholder="Login Email" />
-                                                </div>
-                                                <div>
-                                                    <label className={labelStyle}>พาสเวิร์ด</label>
-                                                    <input required type="text" name="accountPassword" value={formData.accountPassword} onChange={handleInputChange} className={inputStyle} placeholder="Password" />
-                                                </div>
+                                                <div><label className={labelStyle}>อีเมล (แอพ)</label><input required name="accountEmail" value={formData.accountEmail} onChange={handleInputChange} className={inputStyle} placeholder="Login Email" disabled={isSubmitting}/></div>
+                                                <div><label className={labelStyle}>พาสเวิร์ด</label><input required name="accountPassword" value={formData.accountPassword} onChange={handleInputChange} className={inputStyle} placeholder="Password" disabled={isSubmitting}/></div>
                                             </div>
 
                                             <div className="grid grid-cols-2 gap-3">
-                                                <div>
-                                                    <label className={labelStyle}>จอ</label>
-                                                    <div className="relative">
-                                                        <Monitor className="absolute left-3 top-3.5 text-pink-200" size={16} />
-                                                        <input type="text" name="screen" value={formData.screen} onChange={handleInputChange} className={`${inputStyle} pl-9`} placeholder="จอ 1" />
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <label className={labelStyle}>วันที่ซื้อ</label>
-                                                    <div className="relative">
-                                                        <Calendar className="absolute left-3 top-3.5 text-pink-200" size={14} />
-                                                        <input required type="date" name="purchaseDate" value={formData.purchaseDate} onChange={handleInputChange} className={`${inputStyle} pl-9 text-[10px]`} />
-                                                    </div>
-                                                </div>
+                                                <div><label className={labelStyle}>จอ</label><div className="relative"><Monitor className="absolute left-3 top-3.5 text-pink-200" size={16} /><input name="screen" value={formData.screen} onChange={handleInputChange} className={`${inputStyle} pl-9`} placeholder="จอ 1" disabled={isSubmitting}/></div></div>
+                                                <div><label className={labelStyle}>วันที่ซื้อ</label><div className="relative"><Calendar className="absolute left-3 top-3.5 text-pink-200" size={14} /><input required type="date" name="purchaseDate" value={formData.purchaseDate} onChange={handleInputChange} className={`${inputStyle} pl-9 text-[10px]`} disabled={isSubmitting}/></div></div>
                                             </div>
 
-                                            <div>
-                                                <label className={labelStyle}>ปัญหา (แจ้งให้ชัดเจน)</label>
-                                                <textarea required name="problem" value={formData.problem} onChange={handleInputChange} className={`${inputStyle} min-h-[80px] py-3`} placeholder="แจ้งรายละเอียดปัญหาที่นี่..."></textarea>
-                                            </div>
+                                            <div><label className={labelStyle}>ปัญหา (แจ้งให้ชัดเจน)</label><textarea required name="problem" value={formData.problem} onChange={handleInputChange} className={`${inputStyle} min-h-[80px] py-3`} placeholder="แจ้งรายละเอียดปัญหาที่นี่..." disabled={isSubmitting}></textarea></div>
 
                                             <button type="submit" disabled={isSubmitting} className="w-full bg-gradient-to-r from-pink-400 to-pink-300 text-white font-black py-4 rounded-2xl shadow-lg shadow-pink-200/50 flex items-center justify-center gap-2 transition-all active:scale-95 uppercase tracking-widest text-sm disabled:opacity-70">
                                                 {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-                                                {isSubmitting ? 'กำลังส่งข้อมูล...' : 'Submit Report'}
+                                                {isSubmitting ? loadingMsg : 'Submit Report'}
                                             </button>
                                         </div>
                                     </form>
@@ -403,12 +423,9 @@
                             {activeTab === 'list' && (
                                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <div className="flex items-center justify-between px-2">
-                                        <h2 className="text-xl font-black text-pink-500 flex items-center gap-2 uppercase tracking-tighter">
-                                            LIST <span className="text-pink-300 font-light tracking-widest">REPORT</span>
-                                        </h2>
+                                        <h2 className="text-xl font-black text-pink-500 flex items-center gap-2 uppercase tracking-tighter">LIST <span className="text-pink-300 font-light tracking-widest">REPORT</span></h2>
                                         <button onClick={() => setIsAdmin(!isAdmin)} className={`px-3 py-1.5 rounded-xl text-[10px] font-bold flex items-center gap-1 transition-all ${isAdmin ? 'bg-pink-500 text-white shadow-md' : 'bg-white text-gray-400 border border-gray-100'}`}>
-                                            <ShieldCheck size={12} />
-                                            {isAdmin ? 'ADMIN' : 'USER'}
+                                            <ShieldCheck size={12} /> {isAdmin ? 'ADMIN' : 'USER'}
                                         </button>
                                     </div>
 
@@ -423,9 +440,7 @@
                                                     <div className="absolute right-[15%] top-[45%] -translate-y-1/2 opacity-[0.08] text-pink-300 -rotate-12 scale-[4.5] pointer-events-none transition-transform group-hover:scale-[5] duration-500">
                                                         {issue.status === 'completed' ? <CheckCircle2 /> : issue.status === 'in_progress' ? <Wrench /> : <Hourglass />}
                                                     </div>
-
                                                     <div className={`absolute left-0 top-0 bottom-0 w-1 ${issue.status === 'completed' ? 'bg-green-400' : issue.status === 'in_progress' ? 'bg-orange-400' : 'bg-pink-400'}`}></div>
-
                                                     <div className="flex justify-between items-start z-10">
                                                         <div>
                                                             <div className="flex items-center gap-2 mb-1">
@@ -455,27 +470,30 @@
                             <div className="fixed inset-0 z-[100] flex items-end justify-center px-4 pb-8 animate-in fade-in duration-300">
                                 <div className="absolute inset-0 bg-pink-900/10 backdrop-blur-sm" onClick={() => setSelectedIssue(null)}></div>
                                 <div className={`${glassCardStyle} w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col relative animate-in slide-in-from-bottom-8 duration-500 shadow-2xl border-2 border-white/80`}>
-                                    <div className="p-5 border-b border-pink-50 flex justify-between items-center bg-white/40">
+                                    <div className="p-4 border-b border-pink-50 flex justify-between items-center bg-white/40">
                                         <div className="flex items-center gap-3">
-                                            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${selectedIssue.status === 'completed' ? 'bg-green-100 text-green-500' : 'bg-pink-100 text-pink-500'}`}>
-                                                <Info size={20} />
-                                            </div>
+                                            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${selectedIssue.status === 'completed' ? 'bg-green-100 text-green-500' : 'bg-pink-100 text-pink-500'}`}><Info size={20} /></div>
                                             <div>
                                                 <h3 className="text-sm font-black text-gray-700 uppercase leading-none">Issue Details</h3>
                                                 <p className="text-[10px] text-pink-400 font-bold mt-1 uppercase tracking-tighter">Date: {selectedIssue.date}</p>
                                             </div>
                                         </div>
-                                        <button onClick={() => setSelectedIssue(null)} className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center text-gray-400 hover:text-pink-500 transition-colors">
-                                            <X size={18} />
-                                        </button>
+                                        <div className="flex items-center gap-2">
+                                            {/* ปุ่มลบรายการ (ถังขยะ) */}
+                                            {isAdmin && (
+                                                <button onClick={() => deleteIssue(selectedIssue.timestamp)} disabled={isSubmitting} className="w-8 h-8 rounded-full bg-red-50 text-red-400 shadow-sm flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors disabled:opacity-50">
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            )}
+                                            <button onClick={() => setSelectedIssue(null)} className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center text-gray-400 hover:text-pink-500 transition-colors">
+                                                <X size={18} />
+                                            </button>
+                                        </div>
                                     </div>
 
                                     <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
                                         <div className="flex justify-between items-center bg-pink-50/50 p-3 rounded-2xl border border-pink-100">
-                                            <div className="flex items-center gap-2">
-                                                <Smartphone size={16} className="text-pink-400" />
-                                                <span className="text-sm font-black text-gray-700 uppercase">{selectedIssue.app}</span>
-                                            </div>
+                                            <div className="flex items-center gap-2"><Smartphone size={16} className="text-pink-400" /><span className="text-sm font-black text-gray-700 uppercase">{selectedIssue.app}</span></div>
                                             <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${selectedIssue.status === 'completed' ? 'bg-green-400 text-white' : selectedIssue.status === 'in_progress' ? 'bg-orange-400 text-white' : 'bg-pink-400 text-white'}`}>
                                                 {selectedIssue.status === 'completed' ? 'Fixed' : selectedIssue.status === 'in_progress' ? 'In Progress' : 'Pending'}
                                             </div>
@@ -484,69 +502,33 @@
                                         <div className="space-y-3">
                                             <h4 className={labelStyle}>Uploaded Images</h4>
                                             <div className="grid grid-cols-2 gap-3">
+                                                {/* กดรูปแล้วจะเปิด Lightbox แกลลอรี่รวมทุกรูปของเคสนี้ */}
                                                 {selectedIssue.issueImages && selectedIssue.issueImages[0] ? (
-                                                    <a href={selectedIssue.issueImages[0]} target="_blank" className="aspect-square rounded-2xl bg-gray-100 border border-gray-200 overflow-hidden block">
+                                                    <div onClick={() => openGallery([...selectedIssue.issueImages, ...(selectedIssue.receiptImages||[])], 0)} className="aspect-square rounded-2xl bg-gray-100 border border-gray-200 overflow-hidden cursor-pointer active:scale-95 transition-transform">
                                                         <img src={selectedIssue.issueImages[0]} className="w-full h-full object-cover" />
-                                                    </a>
-                                                ) : (
-                                                    <div className="aspect-square rounded-2xl bg-gray-100 border border-gray-200 flex flex-col items-center justify-center text-gray-400 gap-1 italic">
-                                                        <ImageIcon size={24} className="text-gray-300" />
-                                                        <span className="text-[9px]">No Image</span>
                                                     </div>
-                                                )}
+                                                ) : (<div className="aspect-square rounded-2xl bg-gray-100 border border-gray-200 flex flex-col items-center justify-center text-gray-400 gap-1 italic"><ImageIcon size={24} className="text-gray-300" /><span className="text-[9px]">No Image</span></div>)}
+                                                
                                                 {selectedIssue.receiptImages && selectedIssue.receiptImages[0] ? (
-                                                    <a href={selectedIssue.receiptImages[0]} target="_blank" className="aspect-square rounded-2xl bg-gray-100 border border-gray-200 overflow-hidden block">
+                                                    <div onClick={() => openGallery([...selectedIssue.issueImages, ...(selectedIssue.receiptImages||[])], selectedIssue.issueImages.length || 0)} className="aspect-square rounded-2xl bg-gray-100 border border-gray-200 overflow-hidden cursor-pointer active:scale-95 transition-transform">
                                                         <img src={selectedIssue.receiptImages[0]} className="w-full h-full object-cover" />
-                                                    </a>
-                                                ) : (
-                                                    <div className="aspect-square rounded-2xl bg-gray-100 border border-gray-200 flex flex-col items-center justify-center text-gray-400 gap-1 italic">
-                                                        <ImageIcon size={24} className="text-gray-300" />
-                                                        <span className="text-[9px]">No Receipt</span>
                                                     </div>
-                                                )}
+                                                ) : (<div className="aspect-square rounded-2xl bg-gray-100 border border-gray-200 flex flex-col items-center justify-center text-gray-400 gap-1 italic"><ImageIcon size={24} className="text-gray-300" /><span className="text-[9px]">No Receipt</span></div>)}
                                             </div>
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-3">
-                                                <h4 className={labelStyle}>Contact Info</h4>
-                                                <div className="text-xs space-y-1">
-                                                    <p className="font-bold text-gray-700">{selectedIssue.submitterName}</p>
-                                                    <p className="text-gray-400 truncate">{selectedIssue.submitterEmail}</p>
-                                                </div>
-                                            </div>
-                                            <div className="space-y-3">
-                                                <h4 className={labelStyle}>Account Info</h4>
-                                                <div className="text-xs space-y-1">
-                                                    <p className="font-bold text-gray-700 truncate">{selectedIssue.accountEmail}</p>
-                                                    <p className="text-gray-400">Pass: {selectedIssue.accountPassword}</p>
-                                                </div>
-                                            </div>
+                                            <div className="space-y-3"><h4 className={labelStyle}>Contact Info</h4><div className="text-xs space-y-1"><p className="font-bold text-gray-700">{selectedIssue.submitterName}</p><p className="text-gray-400 truncate">{selectedIssue.submitterEmail}</p></div></div>
+                                            <div className="space-y-3"><h4 className={labelStyle}>Account Info</h4><div className="text-xs space-y-1"><p className="font-bold text-gray-700 truncate">{selectedIssue.accountEmail}</p><p className="text-gray-400">Pass: {selectedIssue.accountPassword}</p></div></div>
                                         </div>
 
                                         <div className="grid grid-cols-3 gap-2 bg-white/50 p-3 rounded-2xl border border-pink-50">
-                                            <div className="text-center">
-                                                <p className="text-[9px] text-pink-300 font-bold uppercase">Days</p>
-                                                <p className="text-xs font-black text-gray-600">{selectedIssue.days} วัน</p>
-                                            </div>
-                                            <div className="text-center border-x border-pink-50">
-                                                <p className="text-[9px] text-pink-300 font-bold uppercase">Screen</p>
-                                                <p className="text-xs font-black text-gray-600">{selectedIssue.screen}</p>
-                                            </div>
-                                            <div className="text-center">
-                                                <p className="text-[9px] text-pink-300 font-bold uppercase">Purchased</p>
-                                                <p className="text-xs font-black text-gray-600">{selectedIssue.purchaseDate}</p>
-                                            </div>
+                                            <div className="text-center"><p className="text-[9px] text-pink-300 font-bold uppercase">Days</p><p className="text-xs font-black text-gray-600">{selectedIssue.days} วัน</p></div>
+                                            <div className="text-center border-x border-pink-50"><p className="text-[9px] text-pink-300 font-bold uppercase">Screen</p><p className="text-xs font-black text-gray-600">{selectedIssue.screen}</p></div>
+                                            <div className="text-center"><p className="text-[9px] text-pink-300 font-bold uppercase">Purchased</p><p className="text-xs font-black text-gray-600">{selectedIssue.purchaseDate}</p></div>
                                         </div>
 
-                                        <div className="space-y-2">
-                                            <h4 className={labelStyle}>Problem Description</h4>
-                                            <div className="bg-white/80 p-4 rounded-2xl border border-pink-50 shadow-inner">
-                                                <p className="text-sm text-gray-600 leading-relaxed font-medium italic">
-                                                    "{selectedIssue.problem}"
-                                                </p>
-                                            </div>
-                                        </div>
+                                        <div className="space-y-2"><h4 className={labelStyle}>Problem Description</h4><div className="bg-white/80 p-4 rounded-2xl border border-pink-50 shadow-inner"><p className="text-sm text-gray-600 leading-relaxed font-medium italic">"{selectedIssue.problem}"</p></div></div>
                                     </div>
 
                                     <div className="p-6 border-t border-pink-50 bg-white/60">
@@ -556,46 +538,45 @@
                                                     <div className="flex gap-3">
                                                         {selectedIssue.status === 'pending' && (
                                                             <button onClick={() => changeStatus(selectedIssue.timestamp, 'in_progress')} disabled={isSubmitting} className="flex-1 py-3 bg-orange-100 hover:bg-orange-200 text-orange-600 text-xs font-black rounded-2xl transition-all flex items-center justify-center gap-2 uppercase tracking-widest disabled:opacity-50">
-                                                                <Clock size={16} /> รับเรื่องแก้ไข
+                                                                {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Clock size={16} />} {isSubmitting ? 'รอสักครู่...' : 'รับเรื่องแก้ไข'}
                                                             </button>
                                                         )}
                                                         <button onClick={() => changeStatus(selectedIssue.timestamp, 'completed')} disabled={isSubmitting} className="flex-1 py-3 bg-green-500 hover:bg-green-600 text-white text-xs font-black rounded-2xl transition-all shadow-lg shadow-green-100 flex items-center justify-center gap-2 uppercase tracking-widest disabled:opacity-50">
-                                                            <CheckCircle2 size={16} /> แก้ไขสำเร็จ
+                                                            {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} {isSubmitting ? 'รอสักครู่...' : 'แก้ไขสำเร็จ'}
                                                         </button>
                                                     </div>
                                                 )}
-                                                {selectedIssue.status === 'completed' && (
-                                                    <div className="w-full py-3 bg-green-50 text-green-500 text-xs font-black rounded-2xl text-center uppercase tracking-widest border border-green-100">
-                                                        ✨ งานนี้ได้รับการแก้ไขแล้ว
-                                                    </div>
-                                                )}
+                                                {selectedIssue.status === 'completed' && <div className="w-full py-3 bg-green-50 text-green-500 text-xs font-black rounded-2xl text-center uppercase tracking-widest border border-green-100">✨ งานนี้ได้รับการแก้ไขแล้ว</div>}
                                             </div>
                                         ) : (
-                                            <button onClick={() => setSelectedIssue(null)} className="w-full py-4 bg-pink-400 text-white font-black rounded-2xl shadow-lg shadow-pink-200 flex items-center justify-center gap-2 uppercase tracking-widest text-xs">
-                                                Close Details
-                                            </button>
+                                            <button onClick={() => setSelectedIssue(null)} className="w-full py-4 bg-pink-400 text-white font-black rounded-2xl shadow-lg shadow-pink-200 flex items-center justify-center gap-2 uppercase tracking-widest text-xs">Close Details</button>
                                         )}
                                     </div>
                                 </div>
                             </div>
                         )}
 
-                        {/* Navigation Bar */}
+                        {/* 🖼️ Lightbox แบบเต็มจอ (โชว์รูปใหญ่ + เลื่อนซ้ายขวา) */}
+                        {lightbox.isOpen && lightbox.images.length > 0 && (
+                            <div className="fixed inset-0 z-[200] bg-black/95 flex flex-col items-center justify-center animate-in fade-in">
+                                <button onClick={() => setLightbox({ isOpen: false, images: [], index: 0 })} className="absolute top-6 right-6 text-white p-2 rounded-full bg-white/10 hover:bg-white/20 z-50"><X size={24} /></button>
+                                
+                                <img src={lightbox.images[lightbox.index]} className="max-w-full max-h-[80vh] object-contain transition-transform" />
+                                
+                                {lightbox.images.length > 1 && (
+                                    <>
+                                        <button onClick={() => setLightbox(prev => ({...prev, index: (prev.index - 1 + prev.images.length) % prev.images.length}))} className="absolute left-4 top-1/2 -translate-y-1/2 text-white p-3 rounded-full bg-white/10 hover:bg-white/20"><ChevronLeft size={32} /></button>
+                                        <button onClick={() => setLightbox(prev => ({...prev, index: (prev.index + 1) % prev.images.length}))} className="absolute right-4 top-1/2 -translate-y-1/2 text-white p-3 rounded-full bg-white/10 hover:bg-white/20"><ChevronRight size={32} /></button>
+                                        <div className="absolute bottom-10 text-white text-xs font-bold tracking-widest">{lightbox.index + 1} / {lightbox.images.length}</div>
+                                    </>
+                                )}
+                            </div>
+                        )}
+
                         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-auto min-w-[180px] bg-white/60 backdrop-blur-xl border border-white/40 shadow-[0_10px_30px_rgba(255,192,203,0.3)] rounded-full px-2 py-1.5 flex gap-1 items-center justify-center z-50">
-                            <button onClick={() => setActiveTab('home')} className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300 ${activeTab === 'home' ? 'bg-pink-400 text-white shadow-md scale-105' : 'text-pink-300 hover:bg-pink-50'}`}>
-                                <Home size={18} strokeWidth={activeTab === 'home' ? 3 : 2} />
-                                {activeTab === 'home' && <span className="text-[10px] font-black uppercase tracking-widest">Report</span>}
-                            </button>
+                            <button onClick={() => setActiveTab('home')} className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300 ${activeTab === 'home' ? 'bg-pink-400 text-white shadow-md scale-105' : 'text-pink-300 hover:bg-pink-50'}`}><Home size={18} strokeWidth={activeTab === 'home' ? 3 : 2} />{activeTab === 'home' && <span className="text-[10px] font-black uppercase tracking-widest">Report</span>}</button>
                             <div className="w-[1px] h-4 bg-pink-100 mx-1"></div>
-                            <button onClick={() => setActiveTab('list')} className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300 ${activeTab === 'list' ? 'bg-pink-400 text-white shadow-md scale-105' : 'text-pink-300 hover:bg-pink-50'}`}>
-                                <div className="relative">
-                                    <ListTodo size={18} strokeWidth={activeTab === 'list' ? 3 : 2} />
-                                    {unresolvedCount > 0 && activeTab !== 'list' && (
-                                        <span className="absolute -top-1 -right-1 w-2 h-2 bg-orange-400 rounded-full border border-white"></span>
-                                    )}
-                                </div>
-                                {activeTab === 'list' && <span className="text-[10px] font-black uppercase tracking-widest">History</span>}
-                            </button>
+                            <button onClick={() => setActiveTab('list')} className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300 ${activeTab === 'list' ? 'bg-pink-400 text-white shadow-md scale-105' : 'text-pink-300 hover:bg-pink-50'}`}><div className="relative"><ListTodo size={18} strokeWidth={activeTab === 'list' ? 3 : 2} />{unresolvedCount > 0 && activeTab !== 'list' && (<span className="absolute -top-1 -right-1 w-2 h-2 bg-orange-400 rounded-full border border-white"></span>)}</div>{activeTab === 'list' && <span className="text-[10px] font-black uppercase tracking-widest">History</span>}</button>
                         </div>
                     </div>
                 </div>
@@ -607,9 +588,3 @@
     </script>
 </body>
 </html>
-
-
-
-
-
-
