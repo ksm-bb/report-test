@@ -47,10 +47,10 @@
         } = lucideLib;
 
         // ⚠️ เปลี่ยน URL ของคุณตรงนี้ ⚠️
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzOWh9D-i0K0u0ld84ciVwczeOvCzMjfA7satCV1XdpSFTora5PPwAvT-PPUNJMx-wkpw/exec";
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzyt6vuye3oBbX5gv5T_0U_8vS3_leWN95D7ereEBC08ug6smNvGHjRqfXkC571BhT3-Q/exec";
         const LIFF_ID = "2009412663-XOZGG4cg";
         
-        const PROFILE_IMG_URL = "ใส่_URL_รูปโปรไฟล์โลโก้_ที่นี่"; 
+        // แบนเนอร์ยังใช้ลิงก์ไดร์ฟได้ แต่โปรไฟล์จะถูกดึงจาก LINE อัตโนมัติ
         const BANNER_IMG_URL = "ใส่_URL_รูปแบนเนอร์_ที่นี่"; 
 
         const glassCardStyle = "bg-white/70 backdrop-blur-md border border-white/50 shadow-[0_8px_30px_rgb(255,182,193,0.3)] rounded-3xl";
@@ -80,8 +80,6 @@
 
             const [lightbox, setLightbox] = useState({ isOpen: false, images: [], index: 0 });
             const [replyModal, setReplyModal] = useState({ isOpen: false, timestamp: null, text: '' });
-            
-            // 🌟 เพิ่ม State สำหรับหน้าต่างแจ้งเตือนสำเร็จ (Custom Success Modal)
             const [successModal, setSuccessModal] = useState({ isOpen: false, text: '' });
 
             const [formData, setFormData] = useState({
@@ -148,7 +146,6 @@
                         body: JSON.stringify({ ...formData, uid: userProfile.uid, action: 'submit' })
                     });
                     if ((await res.json()).status === 'success') {
-                        // 🌟 เปลี่ยนจาก Alert เป็นหน้าต่างสวยๆ ที่เราสร้างเอง
                         setSuccessModal({ isOpen: true, text: 'แจ้งเรื่องเรียบร้อย รอการตอบกลับ\n(กรุณาไม่ส่งเรื่องซ้ำ)' });
                         setFormData({ submitterName: '', submitterEmail: '', app: '', days: '', accountEmail: '', accountPassword: '', screen: '', purchaseDate: '', problem: '', issueImages: [], receiptImages: [] });
                         fetchIssues();
@@ -170,7 +167,6 @@
                         setSelectedIssue(null);
                         setReplyModal({ isOpen: false, timestamp: null, text: '' });
                         
-                        // 🌟 แจ้งเตือนแอดมินเมื่อส่งข้อความและแก้ไขสำเร็จ
                         if (newStatus === 'completed') {
                             setSuccessModal({ isOpen: true, text: 'ส่งข้อความและแก้ไขปัญหาเรียบร้อย' });
                         }
@@ -181,7 +177,7 @@
 
             const deleteIssue = async (timestamp) => {
                 if(!confirm("ยืนยันการลบรายการนี้ใช่หรือไม่? ข้อมูลจะไม่สามารถกู้คืนได้")) return;
-                setIsSubmitting(true); setLoadingMsg("กำลังลบรายการ..."); // 🌟 หน้าต่างโหลดดิ้งจะแสดงคำนี้
+                setIsSubmitting(true); setLoadingMsg("กำลังลบรายการ...");
                 try {
                     const res = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'delete', timestamp }) });
                     if ((await res.json()).status === 'success') { await fetchIssues(); setSelectedIssue(null); }
@@ -260,8 +256,9 @@
                                             </div>
                                             <span className="text-xs text-pink-300 font-medium tracking-widest mt-1 uppercase">— ระบบแจ้งปัญหา —</span>
                                         </div>
+                                        {/* 🌟 ดึงรูปโปรไฟล์จาก LINE (userProfile.pic) มาแสดง ถ้าไม่มีให้ขึ้นไอคอนรูปคน */}
                                         <div className="w-14 h-14 bg-white rounded-2xl border-2 border-pink-100 shadow-sm flex items-center justify-center overflow-hidden">
-                                            {PROFILE_IMG_URL.includes("http") ? (<img src={PROFILE_IMG_URL} className="w-full h-full object-cover" />) : (<div className="w-full h-full bg-gradient-to-br from-pink-200 to-pink-100 flex items-center justify-center text-white"><User size={28} /></div>)}
+                                            {userProfile.pic ? (<img src={userProfile.pic} className="w-full h-full object-cover" />) : (<div className="w-full h-full bg-gradient-to-br from-pink-200 to-pink-100 flex items-center justify-center text-white"><User size={28} /></div>)}
                                         </div>
                                     </div>
 
@@ -305,15 +302,14 @@
                                             </div>
                                             <div className="grid grid-cols-2 gap-3"><div><label className={labelStyle}>แอพ</label><div className="relative"><Smartphone className="absolute left-3 top-3.5 text-pink-200" size={16} /><input required name="app" value={formData.app} onChange={handleInputChange} className={`${inputStyle} pl-10`} placeholder="เช่น Netflix" disabled={isSubmitting}/></div></div><div><label className={labelStyle}>จำนวนวัน</label><input required type="number" name="days" value={formData.days} onChange={handleInputChange} className={inputStyle} placeholder="30" disabled={isSubmitting}/></div></div>
                                             <div className="grid grid-cols-2 gap-3"><div><label className={labelStyle}>อีเมล (แอพ)</label><input required name="accountEmail" value={formData.accountEmail} onChange={handleInputChange} className={inputStyle} placeholder="Login Email" disabled={isSubmitting}/></div><div><label className={labelStyle}>พาสเวิร์ด</label><input required name="accountPassword" value={formData.accountPassword} onChange={handleInputChange} className={inputStyle} placeholder="Password" disabled={isSubmitting}/></div></div>
+                                            
+                                            {/* 🌟 ปรับช่องวันที่ซื้อ: บังคับไม่ให้ล้นกรอบด้วย min-w-0 และลด padding */}
                                             <div className="grid grid-cols-2 gap-3">
                                                 <div><label className={labelStyle}>จอ</label><div className="relative"><Monitor className="absolute left-3 top-3.5 text-pink-200" size={16} /><input name="screen" value={formData.screen} onChange={handleInputChange} className={`${inputStyle} pl-9`} placeholder="จอ 1" disabled={isSubmitting}/></div></div>
-                                                
-                                                {/* 🌟 1. ปรับช่องวันที่ซื้อให้สั้นลง ไม่ทะลุกรอบมือถือ โดยลด padding-left และ right ลง */}
-                                                <div><label className={labelStyle}>วันที่ซื้อ</label><div className="relative"><Calendar className="absolute left-2.5 top-3.5 text-pink-200" size={14} /><input required type="date" name="purchaseDate" value={formData.purchaseDate} onChange={handleInputChange} className="w-full bg-white/50 border border-pink-100 focus:border-pink-300 focus:ring-2 focus:ring-pink-200 rounded-2xl pl-8 pr-1 py-3 text-gray-700 outline-none transition-all text-[10px] tracking-tighter" disabled={isSubmitting}/></div></div>
+                                                <div className="min-w-0"><label className={labelStyle}>วันที่ซื้อ</label><div className="relative flex items-center"><Calendar className="absolute left-2 text-pink-200" size={14} /><input required type="date" name="purchaseDate" value={formData.purchaseDate} onChange={handleInputChange} className="w-full min-w-0 bg-white/50 border border-pink-100 focus:border-pink-300 focus:ring-2 focus:ring-pink-200 rounded-2xl pl-7 pr-0 py-3 text-gray-700 outline-none transition-all text-[9px] tracking-tighter" disabled={isSubmitting}/></div></div>
                                             </div>
+
                                             <div><label className={labelStyle}>ปัญหา (แจ้งให้ชัดเจน)</label><textarea required name="problem" value={formData.problem} onChange={handleInputChange} className={`${inputStyle} min-h-[80px] py-3`} placeholder="แจ้งรายละเอียดปัญหาที่นี่..." disabled={isSubmitting}></textarea></div>
-                                            
-                                            {/* 🌟 4. เปลี่ยนข้อความปุ่ม Submit เป็น ส่งเรื่องแจ้งปัญหา */}
                                             <button type="submit" disabled={isSubmitting} className="w-full bg-gradient-to-r from-pink-400 to-pink-300 text-white font-black py-4 rounded-2xl shadow-lg shadow-pink-200/50 flex items-center justify-center gap-2 transition-all active:scale-95 uppercase tracking-widest text-sm disabled:opacity-70">
                                                 {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
                                                 {isSubmitting ? 'กำลังส่งข้อมูล...' : 'ส่งเรื่องแจ้งปัญหา'}
@@ -361,7 +357,6 @@
                             )}
                         </div>
 
-                        {/* Modal กรอก PIN ของ Admin */}
                         {pinModal && (
                             <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 animate-in fade-in">
                                 <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setPinModal(false)}></div>
@@ -377,7 +372,6 @@
                             </div>
                         )}
 
-                        {/* Modal ข้อมูลละเอียด */}
                         {selectedIssue && (
                             <div className="fixed inset-0 z-[100] flex items-end justify-center px-4 pb-8 animate-in fade-in duration-300">
                                 <div className="absolute inset-0 bg-pink-900/10 backdrop-blur-sm" onClick={() => setSelectedIssue(null)}></div>
@@ -420,16 +414,11 @@
                             </div>
                         )}
 
-                        {/* Modal รับข้อความตอบกลับจากแอดมิน */}
                         {replyModal.isOpen && (
                             <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 animate-in fade-in">
                                 <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setReplyModal({ isOpen: false, timestamp: null, text: '' })}></div>
                                 <div className={`${glassCardStyle} w-full max-w-sm p-6 relative z-10 shadow-2xl`}>
-                                    <div className="flex items-center gap-2 mb-4">
-                                        <div className="w-8 h-8 rounded-full bg-pink-100 text-pink-500 flex items-center justify-center"><MessageSquare size={16} /></div>
-                                        {/* 🌟 2. เปลี่ยนคำว่า "ข้อความถึงลูกค้า" เป็น "ข้อความถึงตัวแทน" */}
-                                        <h3 className="font-black text-gray-700 uppercase tracking-tight">ข้อความถึงตัวแทน</h3>
-                                    </div>
+                                    <div className="flex items-center gap-2 mb-4"><div className="w-8 h-8 rounded-full bg-pink-100 text-pink-500 flex items-center justify-center"><MessageSquare size={16} /></div><h3 className="font-black text-gray-700 uppercase tracking-tight">ข้อความถึงตัวแทน</h3></div>
                                     <textarea className={`${inputStyle} min-h-[100px] mb-4`} placeholder="พิมพ์ข้อความตอบกลับ เช่น 'รีเซ็ตรหัสผ่านให้แล้วนะคะ รหัสคือ 1234'" value={replyModal.text} onChange={e => setReplyModal({ ...replyModal, text: e.target.value })}></textarea>
                                     <div className="flex gap-2">
                                         <button onClick={() => setReplyModal({ isOpen: false, timestamp: null, text: '' })} className="flex-1 py-3 bg-gray-100 text-gray-500 rounded-2xl text-xs font-black uppercase">ยกเลิก</button>
@@ -439,7 +428,6 @@
                             </div>
                         )}
 
-                        {/* 🌟 3. หน้าต่าง Loading Overlay แบบล็อกจอกลางหน้าเว็บ (ตอนกดลบ/บันทึก) */}
                         {isSubmitting && (
                             <div className="fixed inset-0 z-[500] flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in">
                                 <div className="bg-white px-8 py-6 rounded-[2rem] shadow-2xl flex flex-col items-center gap-4">
@@ -449,7 +437,6 @@
                             </div>
                         )}
 
-                        {/* 🌟 4 & 5. หน้าต่างแจ้งเตือนทำรายการสำเร็จ (Success Modal) */}
                         {successModal.isOpen && (
                             <div className="fixed inset-0 z-[400] flex items-center justify-center px-4 animate-in fade-in">
                                 <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSuccessModal({ isOpen: false, text: '' })}></div>
@@ -465,7 +452,6 @@
                             </div>
                         )}
 
-                        {/* Lightbox ดูรูป */}
                         {lightbox.isOpen && lightbox.images.length > 0 && (
                             <div className="fixed inset-0 z-[300] bg-black/95 flex flex-col items-center justify-center animate-in fade-in"><button onClick={() => setLightbox({ isOpen: false, images: [], index: 0 })} className="absolute top-6 right-6 text-white p-2 rounded-full bg-white/10 hover:bg-white/20 z-50"><X size={24} /></button><img src={lightbox.images[lightbox.index]} className="max-w-full max-h-[80vh] object-contain transition-transform" />{lightbox.images.length > 1 && (<><button onClick={() => setLightbox(prev => ({...prev, index: (prev.index - 1 + prev.images.length) % prev.images.length}))} className="absolute left-4 top-1/2 -translate-y-1/2 text-white p-3 rounded-full bg-white/10 hover:bg-white/20"><ChevronLeft size={32} /></button><button onClick={() => setLightbox(prev => ({...prev, index: (prev.index + 1) % prev.images.length}))} className="absolute right-4 top-1/2 -translate-y-1/2 text-white p-3 rounded-full bg-white/10 hover:bg-white/20"><ChevronRight size={32} /></button><div className="absolute bottom-10 text-white text-xs font-bold tracking-widest">{lightbox.index + 1} / {lightbox.images.length}</div></>)}</div>
                         )}
@@ -481,6 +467,3 @@
     </script>
 </body>
 </html>
-
-
-
