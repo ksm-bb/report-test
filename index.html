@@ -11,7 +11,8 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-    <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.min.js"></script>
+    
+    <script src="https://unpkg.com/lucide-react@0.292.0/dist/umd/lucide-react.min.js"></script>
 
     <style>
         body { overscroll-behavior-y: none; background-color: #FFF5F8; }
@@ -30,7 +31,7 @@
 
     <script type="text/babel">
         const { useState, useEffect } = React;
-        const lucideLib = window.lucide || window.lucideReact || window.LucideReact || {};
+        const lucideLib = window.lucideReact || window.LucideReact || window.lucide || {};
         const FallbackIcon = () => <span className="w-5 h-5 bg-pink-200 rounded-full inline-block animate-pulse"></span>;
 
         const { 
@@ -46,7 +47,6 @@
             MessageSquare = FallbackIcon
         } = lucideLib;
 
-        // ⚠️ เปลี่ยน URL ของคุณตรงนี้ ⚠️
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzXFV4BcmPsZ_PpZwHgYbcIk7ixn9Sfs886p-IS9mkCtDSEjP4DXpIwb1gQeXcx1bXq/exec";
         const LIFF_ID = "2009412663-XOZGG4cg";
         
@@ -397,7 +397,6 @@
                                             </div>
                                         </div>
 
-                                        {/* 🌟 แสดงกล่องข้อความที่แอดมินตอบกลับ (แสดงเฉพาะเมื่อแก้เสร็จแล้ว และมีข้อความ) */}
                                         {selectedIssue.status === 'completed' && selectedIssue.replyText && (
                                             <div className="space-y-2">
                                                 <h4 className={labelStyle}>Admin Reply</h4>
